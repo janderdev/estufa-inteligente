@@ -14,11 +14,19 @@ import (
 type Sensor struct {
 	nome string
 	id uint16
-	valor uint32
+	valor int16
+}
+
+type Parametros struct {
+	temperaturaMin  int16
+	temperaturaMax  int16
+	umidadeMin 	    uint16
+	nivelCO2Min     uint16
 }
 
 type Estufa struct {
 	sensores [] Sensor
+	parametrosIni Parametros
 }
 
 func checkError(err error, msg string){
@@ -28,16 +36,34 @@ func checkError(err error, msg string){
 	}
 }
 
-func main() {
-	//STRUCT SENSORES
-	var estufa Estufa
-	var temperatura Sensor
-	temperatura.nome = "0123456789"
-	temperatura.id = 1
-	temperatura.valor = 36
+// DECLARAÇOES VARIAVEIS GLOBAIS DO SERVIDOR
+var estufa Estufa
+//-----------
 
-	//PESQUISAR SOBRE APPEND
+func main() {
+	fmt.Println("------- SERVIDOR INICIADO ---------")
+	fmt.Println("Aguardando CLIENTE definir parms iniciais...")
+
+	//DEFININDO VALORES PARA A STRUCT SENSORES
+	var temperatura Sensor
+	temperatura.nome = "Temperatura"
+	temperatura.id = 1
+	temperatura.valor = -36
+
+	var umidade Sensor
+	umidade.nome = "Umidade do Solo"
+	umidade.id = 2
+	umidade.valor = 400
+
+	var nivelCO2 Sensor
+	nivelCO2.nome = "Nível de CO2"
+	nivelCO2.id = 3
+	nivelCO2.valor = 300
+
+	//ADICIONANDO SENSORES A ESTUFA
 	estufa.sensores = append(estufa.sensores, temperatura)
+	estufa.sensores = append(estufa.sensores, umidade)
+	estufa.sensores = append(estufa.sensores, nivelCO2)
 
 	//----------------
 	tcpAddr, err := net.ResolveTCPAddr("tcp", ":3200")
@@ -52,6 +78,7 @@ func main() {
 			return
 		}
 
+
 		connGetParametrosDoCliente(conn)
 		break
 	}
@@ -64,24 +91,23 @@ func main() {
 				return
 			}
 
-			connRetornaSensorInfo(novaConn, estufa.sensores)
+			connRetornaSensorInfo(novaConn)
 		}
 	}
 
 }
 
-func connRetornaSensorInfo(conn net.Conn, sensores []Sensor, ) {
+func connRetornaSensorInfo(conn net.Conn) {
 	result := make([]byte, 2)
 	conn.Read(result[:])
 	valor := binary.BigEndian.Uint16(result)
 
 	var dadosSensor Sensor
-	for _, sensor := range sensores {
+	for _, sensor := range estufa.sensores {
 		if sensor.id == valor {
 			dadosSensor = sensor
 		}
 	}
-
 
 	var buffer bytes.Buffer
 	buffer = converteSensorEmArrayDeBytes(dadosSensor, buffer)
@@ -109,13 +135,19 @@ func connGetParametrosDoCliente(conn net.Conn) {
 	decodePacket := packet.Layer(camada.ParametersLayerType)
 
 	if decodePacket != nil {
-		fmt.Println("--- PARAMETROS DA ESTUFA PASSADOS PELO CLIENTE ---")
+		fmt.Println("------------ PARAMETROS DEFINIDOS --------------")
 		content, _ := decodePacket.(*camada.ParametersLayer)
-		fmt.Println("TemperaturaMin:", int32(content.TemperaturaMin))
-		fmt.Println("TemperaturaMax:", int32(content.TemperaturaMax))
+		fmt.Println("TemperaturaMin:", int16(content.TemperaturaMin))
+		fmt.Println("TemperaturaMax:", int16(content.TemperaturaMax))
 		fmt.Println("UmidadeMin:", content.UmidadeMin)
 		fmt.Println("NivelCO2Min:", content.NivelCO2Min)
-		fmt.Println("---------------------------------------------------")
+		fmt.Println("------------------------------------------------")
+
+		//GUARDADOS PARAMENTROS NA MEMORIA LOCAL DO SEVIDOR
+		estufa.parametrosIni.temperaturaMin = int16(content.TemperaturaMin)
+		estufa.parametrosIni.temperaturaMax = int16(content.TemperaturaMax)
+		estufa.parametrosIni.umidadeMin = content.UmidadeMin
+		estufa.parametrosIni.nivelCO2Min = content.NivelCO2Min
 	}
 	conn.Close()
 }
@@ -123,10 +155,9 @@ func connGetParametrosDoCliente(conn net.Conn) {
 func converteSensorEmArrayDeBytes(sensor struct {
 	nome string
 	id uint16
-	valor uint32
+	valor int16
 }, buffer bytes.Buffer) bytes.Buffer {
 
-	//var nomeBytes = make([]byte, 15)
 	var nomeBytes = make([]byte, 15)
 	for i, j := range []byte(sensor.nome) {
 		nomeBytes[i] = byte(j)
@@ -138,7 +169,6 @@ func converteSensorEmArrayDeBytes(sensor struct {
 	binary.BigEndian.PutUint16(idBytes, sensor.id)
 	binary.BigEndian.PutUint32(valorBytes, uint32(sensor.valor))
 
-	fmt.Println(nomeBytes)
 	buffer.Write(nomeBytes)
 	buffer.Write(idBytes)
 	buffer.Write(valorBytes)

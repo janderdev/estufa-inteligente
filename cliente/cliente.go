@@ -65,22 +65,21 @@ func novaConnGetSensorInfo(codSensorBytes []byte, addr *net.TCPAddr) {
 	decodePacket := packet.Layer(camada.RequestLayerType)
 
 	if decodePacket != nil {
-		fmt.Println("--------------- DADOS DO SENSOR ------------------")
+		fmt.Println("---------------- DADOS DO SENSOR ------------------")
 		content, _ := decodePacket.(*camada.RequestLayer)
 		fmt.Println("ID:", content.IDSensor)
 		fmt.Println("Nome:", content.Nome)
-		fmt.Println("Valor(em Celcius):", int16(content.Valor))
+		fmt.Println("Valor:", int16(content.Valor))
 		fmt.Println("---------------------------------------------------")
 	}
 
 	novaConn.Close()
 }
 
-
 func reqIDSensorUsuario() uint16 {
 	var idSensor uint16
-	fmt.Println("---- SOLICITAR INFORMAÇÕES DO SENSOR ----")
-	fmt.Print("Digite o ID do Sensor: ")
+	fmt.Println("--------- SOLICITAR LEITURA DO SENSOR ---------")
+	fmt.Print("Digite o ID do Sensor (Ex.: 1): ")
 	fmt.Scanln(&idSensor)
 	return idSensor
 }
