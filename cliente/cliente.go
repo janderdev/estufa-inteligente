@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/google/gopacket"
+	"io/ioutil"
 	"net"
 	"os"
 )
@@ -38,17 +39,47 @@ func main() {
 	conn.Write(pacote.Data())
 	conn.Close()
 
-
-	idSensor := reqIDSensorCliente()
-	var idSensorBytes = make([]byte, 2)
-	binary.BigEndian.PutUint16(idSensorBytes, idSensor)
-	conn.Write(idSensorBytes)
-
+	//-------------------------------
+	for {
+		idSensor := reqIDSensorUsuario()
+		var idSensorBytes = make([]byte, 2)
+		binary.BigEndian.PutUint16(idSensorBytes, idSensor)
+		novaConnGetSensorInfo(idSensorBytes, tcpAddr)
+	}
 }
 
-func reqIDSensorCliente() uint16 {
+func novaConnGetSensorInfo(codSensorBytes []byte, addr *net.TCPAddr) {
+	novaConn, err := net.DialTCP("tcp", nil, addr)
+	checkError(err, "DialTCP")
+	novaConn.Write(codSensorBytes)
+
+	result, err := ioutil.ReadAll(novaConn)
+	checkError(err, "ReadAll")
+
+	packet := gopacket.NewPacket(
+		result,
+		camada.RequestLayerType,
+		gopacket.Default,
+	)
+
+	decodePacket := packet.Layer(camada.RequestLayerType)
+
+	if decodePacket != nil {
+		fmt.Println("--------------- DADOS DO SENSOR ------------------")
+		content, _ := decodePacket.(*camada.RequestLayer)
+		fmt.Println("ID:", content.IDSensor)
+		fmt.Println("Nome:", content.Nome)
+		fmt.Println("Valor(em Celcius):", int16(content.Valor))
+		fmt.Println("---------------------------------------------------")
+	}
+
+	novaConn.Close()
+}
+
+
+func reqIDSensorUsuario() uint16 {
 	var idSensor uint16
-	fmt.Println("---- BUSCANDO INFORMAÇÕES DO SENSOR ----")
+	fmt.Println("---- SOLICITAR INFORMAÇÕES DO SENSOR ----")
 	fmt.Print("Digite o ID do Sensor: ")
 	fmt.Scanln(&idSensor)
 	return idSensor

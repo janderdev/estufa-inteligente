@@ -34,7 +34,7 @@ var RequestLayerType = gopacket.RegisterLayerType(
 	2003,
 	gopacket.LayerTypeMetadata{
 		"RequestLayerType",
-		gopacket.DecodeFunc(decodeRequestLayerType),
+		gopacket.DecodeFunc(decodeRequestLayer),
 	},
 )
 
@@ -93,14 +93,14 @@ func (e ParametersLayer) LayerContents() []byte {
 /* ---------------------------------------------------------------- */
 
 /* RequestLayer FUNCTIONS ----------------------------------------- */
-func decodeRequestLayerType(data []byte, p gopacket.PacketBuilder) error {
+func decodeRequestLayer(data []byte, p gopacket.PacketBuilder) error {
 	nome := string(data[:15])
 	idSensor := binary.BigEndian.Uint16(data[15:17])
-	valor := binary.BigEndian.Uint32(data[17:20])
+	valor := binary.BigEndian.Uint32(data[17:21])
 	var restoDosDados []byte = nil
 
-	if len(data) >= 20 {
-		restoDosDados = data[20:]
+	if len(data) >= 21 {
+		restoDosDados = data[21:]
 	}
 
 	p.AddLayer(&RequestLayer {
@@ -124,7 +124,7 @@ func (e RequestLayer) LayerPayload() []byte {
 func (e RequestLayer) LayerContents() []byte {
 	var nomeBytes = []byte(e.Nome)
 	var idSensorBytes = make([]byte, 2)
-	var valorBytes = make([]byte, 3)
+	var valorBytes = make([]byte, 4)
 
 	binary.BigEndian.PutUint16(idSensorBytes, e.IDSensor)
 	binary.BigEndian.PutUint32(valorBytes, e.Valor)

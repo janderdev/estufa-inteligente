@@ -2,12 +2,24 @@ package main
 
 import (
 	"../camada"
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"github.com/google/gopacket"
 	"io/ioutil"
 	"net"
 	"os"
 )
+
+type Sensor struct {
+	nome string
+	id uint16
+	valor uint32
+}
+
+type Estufa struct {
+	sensores [] Sensor
+}
 
 func checkError(err error, msg string){
 	if err != nil {
@@ -17,6 +29,17 @@ func checkError(err error, msg string){
 }
 
 func main() {
+	//STRUCT SENSORES
+	var estufa Estufa
+	var temperatura Sensor
+	temperatura.nome = "0123456789"
+	temperatura.id = 1
+	temperatura.valor = 36
+
+	//PESQUISAR SOBRE APPEND
+	estufa.sensores = append(estufa.sensores, temperatura)
+
+	//----------------
 	tcpAddr, err := net.ResolveTCPAddr("tcp", ":3200")
 	checkError(err, "ResolveTCPAddr")
 
@@ -25,12 +48,52 @@ func main() {
 
 	for {
 		conn, err := listener.Accept()
-
 		if err != nil {
 			return
 		}
+
 		connGetParametrosDoCliente(conn)
+		break
 	}
+
+	//-----------------------------------------------
+	for {
+		for {
+			novaConn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+
+			connRetornaSensorInfo(novaConn, estufa.sensores)
+		}
+	}
+
+}
+
+func connRetornaSensorInfo(conn net.Conn, sensores []Sensor, ) {
+	result := make([]byte, 2)
+	conn.Read(result[:])
+	valor := binary.BigEndian.Uint16(result)
+
+	var dadosSensor Sensor
+	for _, sensor := range sensores {
+		if sensor.id == valor {
+			dadosSensor = sensor
+		}
+	}
+
+
+	var buffer bytes.Buffer
+	buffer = converteSensorEmArrayDeBytes(dadosSensor, buffer)
+
+	pacote := gopacket.NewPacket(
+		buffer.Bytes(),
+		camada.RequestLayerType,
+		gopacket.Default,
+	)
+
+	conn.Write(pacote.Data())
+	conn.Close()
 }
 
 func connGetParametrosDoCliente(conn net.Conn) {
@@ -57,27 +120,28 @@ func connGetParametrosDoCliente(conn net.Conn) {
 	conn.Close()
 }
 
+func converteSensorEmArrayDeBytes(sensor struct {
+	nome string
+	id uint16
+	valor uint32
+}, buffer bytes.Buffer) bytes.Buffer {
 
-
-/*
-func connGetSensorDoServidor(listener *net.TCPListener) {
-	conn, err := listener.Accept()
-	if err != nil {
-		return
+	//var nomeBytes = make([]byte, 15)
+	var nomeBytes = make([]byte, 15)
+	for i, j := range []byte(sensor.nome) {
+		nomeBytes[i] = byte(j)
 	}
 
-	idSensorBytes, err := ioutil.ReadAll(conn)
-	checkError(err, "ReadAll")
+	var idBytes = make([]byte, 2)
+	var valorBytes = make([]byte, 4)
 
-	idSensor := binary.BigEndian.Uint16(idSensorBytes[0:2])
+	binary.BigEndian.PutUint16(idBytes, sensor.id)
+	binary.BigEndian.PutUint32(valorBytes, uint32(sensor.valor))
 
-	connGetSensorEstufa(idSensor)
+	fmt.Println(nomeBytes)
+	buffer.Write(nomeBytes)
+	buffer.Write(idBytes)
+	buffer.Write(valorBytes)
 
-	conn.Close()
+	return buffer
 }
-
-func connGetSensorEstufa(idSensor uint16) {
-
-}
-*/
-
