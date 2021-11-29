@@ -58,19 +58,19 @@ func novaConnGetSensorInfo(codSensorBytes []byte, addr *net.TCPAddr) {
 
 	packet := gopacket.NewPacket(
 		result,
-		camada.RequestLayerType,
+		camada.SensorLayerType,
 		gopacket.Default,
 	)
 
-	decodePacket := packet.Layer(camada.RequestLayerType)
+	decodePacket := packet.Layer(camada.SensorLayerType)
 
 	if decodePacket != nil {
-		fmt.Println("---------------- DADOS DO SENSOR ------------------")
-		content, _ := decodePacket.(*camada.RequestLayer)
+		fmt.Println("####### DADOS DO SENSOR ########")
+		content, _ := decodePacket.(*camada.SensorLayer)
 		fmt.Println("ID:", content.IDSensor)
 		fmt.Println("Nome:", content.Nome)
 		fmt.Println("Valor:", int16(content.Valor))
-		fmt.Println("---------------------------------------------------")
+		fmt.Println("--------------------------------")
 	}
 
 	novaConn.Close()
@@ -135,6 +135,3 @@ func inputParametrosIniciais() struct {
 
 	return t
 }
-
-
-
