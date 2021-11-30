@@ -28,9 +28,8 @@ type Parametros struct {
 type Atuador struct {
 	nome string
 	id uint16
-	status uint8 //NO LUGAR DO BOOL - TRUE: 1, FALSE: 0
+	status uint16
 }
-
 
 type Estufa struct {
 	parametrosIni Parametros
@@ -61,12 +60,6 @@ func main() {
 	listenerEstufaSensor, err := net.ListenTCP("tcp", addrEstufaSensor)
 	checkError(err, "ListenTCP")
 
-	// ELEMENTOS INICIAIS DA CONEXÃO DOS SOCKETS SERVIDOR & CLIENTE (SENSORES)
-	//addrEstufaAtuador, err := net.ResolveTCPAddr("tcp", ":3500")
-	//checkError(err, "ResolveTCPAddr")
-	//
-	//connEstufaAtuador, err := net.DialTCP("tcp", nil, addrEstufaAtuador)
-	//checkError(err, "DialTCP Atuador")
 
 	for {
 		conn, err := listener.Accept()
@@ -105,7 +98,7 @@ func presetAtuadores() {
 	irrigador.status = 0
 
 	var injetorCO2 Atuador
-	injetorCO2.nome = "injetorCO2"
+	injetorCO2.nome = "InjetorCO2"
 	injetorCO2.id = 40
 	injetorCO2.status = 0
 
@@ -128,26 +121,23 @@ func presetSensores() {
 	//----------------
 }
 
-
-func VerificaOsLimitesMinMax(conn net.Conn) {
+func verificaOsLimitesMinMax(conn net.Conn) {
 	tempMin := estufa.parametrosIni.temperaturaMin
 	tempMax := estufa.parametrosIni.temperaturaMax
 	umidadeMin := estufa.parametrosIni.umidadeMin
 	nivelC02min := estufa.parametrosIni.nivelCO2Min
-	var update uint8 = 0
+	var atuadoresAlterados [] Atuador
 
 	// VERIFICA SENSOR 1 _ ATUADOR 1 - AQUECEDOR
 	if estufa.sensores[0].valor < tempMin {
 		if estufa.atuadores[0].status == 0 {
 			estufa.atuadores[0].status = 1
-			connEnviaInfoDoAtuador(conn, estufa.atuadores[0])
-			update = 1
+			atuadoresAlterados = append(atuadoresAlterados, estufa.atuadores[0])
 		}
 	} else {
 		if estufa.atuadores[0].status == 1 {
 			estufa.atuadores[0].status = 0
-			connEnviaInfoDoAtuador(conn, estufa.atuadores[0])
-			update = 1
+			atuadoresAlterados = append(atuadoresAlterados, estufa.atuadores[0])
 		}
 	}
 
@@ -155,14 +145,12 @@ func VerificaOsLimitesMinMax(conn net.Conn) {
 	if estufa.sensores[0].valor > tempMax {
 		if estufa.atuadores[1].status == 0 {
 			estufa.atuadores[1].status = 1
-			connEnviaInfoDoAtuador(conn, estufa.atuadores[1])
-			update = 1
+			atuadoresAlterados = append(atuadoresAlterados, estufa.atuadores[1])
 		}
 	} else {
 		if estufa.atuadores[1].status == 1 {
 			estufa.atuadores[1].status = 0
-			connEnviaInfoDoAtuador(conn, estufa.atuadores[1])
-			update = 1
+			atuadoresAlterados = append(atuadoresAlterados, estufa.atuadores[1])
 		}
 	}
 
@@ -170,14 +158,12 @@ func VerificaOsLimitesMinMax(conn net.Conn) {
 	if uint16(estufa.sensores[1].valor) < umidadeMin {
 		if estufa.atuadores[2].status == 0 {
 			estufa.atuadores[2].status = 1
-			connEnviaInfoDoAtuador(conn, estufa.atuadores[2])
-			update = 1
+			atuadoresAlterados = append(atuadoresAlterados, estufa.atuadores[2])
 		}
 	} else {
 		if estufa.atuadores[2].status == 1 {
 			estufa.atuadores[2].status = 0
-			connEnviaInfoDoAtuador(conn, estufa.atuadores[2])
-			update = 1
+			atuadoresAlterados = append(atuadoresAlterados, estufa.atuadores[2])
 		}
 	}
 
@@ -185,24 +171,49 @@ func VerificaOsLimitesMinMax(conn net.Conn) {
 	if uint16(estufa.sensores[2].valor) < nivelC02min {
 		if estufa.atuadores[3].status == 0 {
 			estufa.atuadores[3].status = 1
-			connEnviaInfoDoAtuador(conn, estufa.atuadores[3])
-			update = 1
+			atuadoresAlterados = append(atuadoresAlterados, estufa.atuadores[3])
 		}
 	} else {
 		if estufa.atuadores[3].status == 1 {
 			estufa.atuadores[3].status = 0
-			connEnviaInfoDoAtuador(conn, estufa.atuadores[3])
-			update = 1
+			atuadoresAlterados = append(atuadoresAlterados, estufa.atuadores[3])
 		}
 	}
 
-	if update == 0 {
-		var pacote []byte
-		pacote = nil
-		conn.Write(pacote)
+	var buffer bytes.Buffer
+	n := len(atuadoresAlterados)
+
+	if n != 0 {
+		buffer = convertAtuadoresEmArrayBytes(atuadoresAlterados, buffer, n)
 	}
+
+	conn.Write(buffer.Bytes())
 }
 
+func convertAtuadoresEmArrayBytes(atuadores []Atuador, buffer bytes.Buffer, n int) bytes.Buffer {
+	var nBytes = make([]byte, 2)
+	binary.BigEndian.PutUint16(nBytes, uint16(n))
+	buffer.Write(nBytes)
+
+	for k := 0; k < n; k++ {
+		var nomeBytes = make([]byte, 15)
+		for i, j := range []byte(atuadores[k].nome) {
+			nomeBytes[i] = byte(j)
+		}
+
+		var idBytes = make([]byte, 2)
+		var statusBytes = make([]byte, 2)
+
+		binary.BigEndian.PutUint16(idBytes, atuadores[k].id)
+		binary.BigEndian.PutUint16(statusBytes, atuadores[k].status)
+
+		buffer.Write(nomeBytes)
+		buffer.Write(idBytes)
+		buffer.Write(statusBytes)
+	}
+
+	return buffer
+}
 
 func loopGetSensoresEstufa(listenerEstufa *net.TCPListener) {
 
@@ -216,7 +227,7 @@ func loopGetSensoresEstufa(listenerEstufa *net.TCPListener) {
 			connGetSensoresInfoDaEstufa(conn)
 			break
 		}
-		time.Sleep(4 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -291,7 +302,7 @@ func connGetSensoresInfoDaEstufa(conn net.Conn) {
 		fmt.Println("A leitura dos sensores chegaram!")
 	}
 
-	VerificaOsLimitesMinMax(conn)
+	verificaOsLimitesMinMax(conn)
 	conn.Close()
 }
 
@@ -318,11 +329,6 @@ func connRetornaSensorInfo(conn net.Conn) {
 
 	conn.Write(pacote.Data())
 	conn.Close()
-}
-
-func connEnviaInfoDoAtuador(conn net.Conn, atuador Atuador) {
-	msg := []byte("Um atuador foi alterado:" + atuador.nome)
-	conn.Write(msg)
 }
 
 func converteSensorEmArrayDeBytes(sensor Sensor, buffer bytes.Buffer) bytes.Buffer {

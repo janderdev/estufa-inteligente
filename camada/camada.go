@@ -27,7 +27,12 @@ type AtuadorLayer struct {
 	Nome string
 	IDAtuador uint16
 	Status uint8
-	restoDosDados [] byte
+}
+
+type AtuadoresLayer struct {
+	Tamanho int
+	Atuadores [] AtuadorLayer
+	restoDosDados []byte
 }
 
 type SensoresLayer struct {
@@ -61,11 +66,11 @@ var SensoresLayerType = gopacket.RegisterLayerType(
 		gopacket.DecodeFunc(decodeSensoresLayer),
 })
 
-var AtuadorLayerType = gopacket.RegisterLayerType(
+var AtuadoresLayerType = gopacket.RegisterLayerType(
 	2005,
 	gopacket.LayerTypeMetadata{
-		"AtuadorLayerType",
-		gopacket.DecodeFunc(decodeAtuadorLayer),
+		"AtuadoresLayerType",
+		gopacket.DecodeFunc(decodeAtuadoresLayer),
 })
 
 
@@ -122,7 +127,6 @@ func (p ParametersLayer) LayerContents() []byte {
 
 	return contents
 }
-
 
 /* SensorLayer FUNCTIONS ----------------------------------------- */
 func decodeSensorLayer(data []byte, p gopacket.PacketBuilder) error {
@@ -257,45 +261,92 @@ func (s SensoresLayer) LayerContents() []byte {
 }
 
 
-/* AtuadorLayer FUNCTIONS -------------------------------------- */
-func decodeAtuadorLayer(data []byte, p gopacket.PacketBuilder) error {
-	nome := string(data[:15])
-	idAtuador := binary.BigEndian.Uint16(data[15:17])
-	status := data[17]
+/* AtuadoresLayer FUNCTIONS -------------------------------------- */
+func decodeAtuadoresLayer(data []byte, p gopacket.PacketBuilder) error {
+	var tam = int(binary.BigEndian.Uint16(data[:2]))
 
-	var restoDosDados []byte = nil
-	if len(data) >= 17 {
-		restoDosDados = data[17:]
+	var atuadores [] AtuadorLayer
+	res := 0
+	if tam > 0 {
+		var atuador1 AtuadorLayer
+		atuadores = append(atuadores, atuador1)
+
+		atuadores[0].Nome = string(data[2:17])
+		atuadores[0].IDAtuador = binary.BigEndian.Uint16(data[17:19])
+		atuadores[0].Status = data[20]
+		res = 21
 	}
 
-	p.AddLayer(&AtuadorLayer{
-		nome,
-		idAtuador,
-		status,
+	if tam > 1 {
+		var atuador2 AtuadorLayer
+		atuadores = append(atuadores, atuador2)
+
+		atuadores[1].Nome = string(data[21:36])
+		atuadores[1].IDAtuador = binary.BigEndian.Uint16(data[36:38])
+		atuadores[1].Status = data[38]
+		res = 39
+	}
+
+	if tam > 2 {
+		var atuador3 AtuadorLayer
+		atuadores = append(atuadores, atuador3)
+
+		atuadores[2].Nome = string(data[39:54])
+		atuadores[2].IDAtuador = binary.BigEndian.Uint16(data[54:56])
+		atuadores[2].Status = data[56]
+		res = 57
+	}
+
+	if tam > 3 {
+		var atuador4 AtuadorLayer
+		atuadores = append(atuadores, atuador4)
+
+		atuadores[3].Nome = string(data[57:72])
+		atuadores[3].IDAtuador = binary.BigEndian.Uint16(data[72:74])
+		atuadores[3].Status = data[74]
+		res = 75
+	}
+
+	var restoDosDados []byte = nil
+	if len(data) >= res {
+		restoDosDados = data[res:]
+	}
+
+	p.AddLayer(&AtuadoresLayer{
+		tam,
+		atuadores,
 		restoDosDados,
 	})
 
 	return p.NextDecoder(gopacket.LayerTypePayload)
 }
 
-func (a AtuadorLayer) LayerType() gopacket.LayerType {
-	return AtuadorLayerType
+func (a AtuadoresLayer) LayerType() gopacket.LayerType {
+	return AtuadoresLayerType
 }
 
-func (a AtuadorLayer) LayerPayload() []byte {
+func (a AtuadoresLayer) LayerPayload() []byte {
 	return a.restoDosDados
 }
 
-func (a AtuadorLayer) LayerContents() []byte {
-	var nomeBytes = []byte(a.Nome)
-	var statusByte = []byte{a.Status}
-	var idAtuadorBytes = make([]byte, 2)
-	binary.BigEndian.PutUint16(idAtuadorBytes, a.IDAtuador)
+func (a AtuadoresLayer) LayerContents() []byte {
+	var tamBytes = make([]byte, 2)
+	binary.BigEndian.PutUint16(tamBytes, uint16(a.Tamanho))
 
 	var contents []byte
-	contents = append(nomeBytes)
-	contents = append(idAtuadorBytes)
-	contents = append(statusByte)
+
+	contents = append(tamBytes)
+
+	for i := 0; i < a.Tamanho; i++ {
+		var nomeBytes = []byte(a.Atuadores[i].Nome)
+		var statusByte = []byte{a.Atuadores[i].Status}
+		var idAtuadorBytes = make([]byte, 2)
+		binary.BigEndian.PutUint16(idAtuadorBytes, a.Atuadores[i].IDAtuador)
+
+		contents = append(nomeBytes)
+		contents = append(idAtuadorBytes)
+		contents = append(statusByte)
+	}
 
 	return contents
 }
