@@ -14,7 +14,7 @@ type ParametersLayer struct {
 	restoDosDados   [] byte
 }
 
-// SensorLayer É uma camada do protocolo que trata comunicação (codificação e decodificação) dos dados dos sensores na aplicação.
+// SensorLayer É uma camada do protocolo que trata comunicação (codificação e decodificação) dos dados de um único sensor.
 type SensorLayer struct {
 	Nome string
 	IDSensor uint16
@@ -22,24 +22,26 @@ type SensorLayer struct {
 	restoDosDados [] byte
 }
 
-// AtuadorLayer É uma camada do protocolo que trata comunicação (codificação e decodificação) dos dados dos sensores na aplicação.
-type AtuadorLayer struct {
-	Nome string
-	IDAtuador uint16
-	Status uint8
-}
-
-type AtuadoresLayer struct {
-	Tamanho int
-	Atuadores [] AtuadorLayer
-	restoDosDados []byte
-}
-
+// SensorLayer É uma camada do protocolo que trata comunicação (codificação e decodificação) de um ARRAY de sensores.
 type SensoresLayer struct {
 	Temperatura SensorLayer
 	Umidade SensorLayer
 	NivelDeCO2 SensorLayer
 	restoDosDados [] byte
+}
+
+// AtuadorLayer é uma struct usada dentro de AtuadoresLayer
+type AtuadorLayer struct {
+	Nome string
+	IDAtuador uint16
+	Status uint16
+}
+
+// AtuadoresLayer É uma camada do protocolo que trata comunicação (codificação e decodificação) dos dados dos atuadores.
+type AtuadoresLayer struct {
+	Tamanho int
+	Atuadores [] AtuadorLayer
+	restoDosDados []byte
 }
 
 
@@ -72,7 +74,6 @@ var AtuadoresLayerType = gopacket.RegisterLayerType(
 		"AtuadoresLayerType",
 		gopacket.DecodeFunc(decodeAtuadoresLayer),
 })
-
 
 
 /* ParametersLayer FUNCTIONS -------------------------------------- */
@@ -127,6 +128,7 @@ func (p ParametersLayer) LayerContents() []byte {
 
 	return contents
 }
+
 
 /* SensorLayer FUNCTIONS ----------------------------------------- */
 func decodeSensorLayer(data []byte, p gopacket.PacketBuilder) error {
@@ -260,7 +262,6 @@ func (s SensoresLayer) LayerContents() []byte {
 	return contents
 }
 
-
 /* AtuadoresLayer FUNCTIONS -------------------------------------- */
 func decodeAtuadoresLayer(data []byte, p gopacket.PacketBuilder) error {
 	var tam = int(binary.BigEndian.Uint16(data[:2]))
@@ -273,7 +274,7 @@ func decodeAtuadoresLayer(data []byte, p gopacket.PacketBuilder) error {
 
 		atuadores[0].Nome = string(data[2:17])
 		atuadores[0].IDAtuador = binary.BigEndian.Uint16(data[17:19])
-		atuadores[0].Status = data[20]
+		atuadores[0].Status = binary.BigEndian.Uint16(data[19:21])
 		res = 21
 	}
 
@@ -283,28 +284,28 @@ func decodeAtuadoresLayer(data []byte, p gopacket.PacketBuilder) error {
 
 		atuadores[1].Nome = string(data[21:36])
 		atuadores[1].IDAtuador = binary.BigEndian.Uint16(data[36:38])
-		atuadores[1].Status = data[38]
-		res = 39
+		atuadores[1].Status = binary.BigEndian.Uint16(data[38:40])
+		res = 40
 	}
 
 	if tam > 2 {
 		var atuador3 AtuadorLayer
 		atuadores = append(atuadores, atuador3)
 
-		atuadores[2].Nome = string(data[39:54])
-		atuadores[2].IDAtuador = binary.BigEndian.Uint16(data[54:56])
-		atuadores[2].Status = data[56]
-		res = 57
+		atuadores[2].Nome = string(data[40:55])
+		atuadores[2].IDAtuador = binary.BigEndian.Uint16(data[55:57])
+		atuadores[2].Status = binary.BigEndian.Uint16(data[57:59])
+		res = 59
 	}
 
 	if tam > 3 {
 		var atuador4 AtuadorLayer
 		atuadores = append(atuadores, atuador4)
 
-		atuadores[3].Nome = string(data[57:72])
-		atuadores[3].IDAtuador = binary.BigEndian.Uint16(data[72:74])
-		atuadores[3].Status = data[74]
-		res = 75
+		atuadores[3].Nome = string(data[59:74])
+		atuadores[3].IDAtuador = binary.BigEndian.Uint16(data[74:76])
+		atuadores[3].Status = binary.BigEndian.Uint16(data[76:78])
+		res = 78
 	}
 
 	var restoDosDados []byte = nil
@@ -339,9 +340,11 @@ func (a AtuadoresLayer) LayerContents() []byte {
 
 	for i := 0; i < a.Tamanho; i++ {
 		var nomeBytes = []byte(a.Atuadores[i].Nome)
-		var statusByte = []byte{a.Atuadores[i].Status}
+		var statusByte = make([]byte, 2)
 		var idAtuadorBytes = make([]byte, 2)
+
 		binary.BigEndian.PutUint16(idAtuadorBytes, a.Atuadores[i].IDAtuador)
+		binary.BigEndian.PutUint16(statusByte, a.Atuadores[i].Status)
 
 		contents = append(nomeBytes)
 		contents = append(idAtuadorBytes)

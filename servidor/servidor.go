@@ -37,7 +37,7 @@ type Estufa struct {
 	atuadores [] Atuador
 }
 
-// DECLARAÇOES VARIAVEIS GLOBAIS DO SERVIDOR
+// DECLARAÇÃO STRUCT GLOBAL DO SERVIDOR - ARMAZENAS OS DADOS DO Parametrs Mín e Max, Sensores e Atuadores
 var estufa Estufa
 //-----------
 
@@ -45,22 +45,22 @@ func main() {
 	presetSensores()
 	presetAtuadores()
 
-	fmt.Println("------- SERVIDOR INICIADO ---------")
-	fmt.Println("Aguardando CLIENTE definir parms iniciais...")
+	fmt.Println("------------ SERVIDOR INICIADO -----------")
+	fmt.Println("Aguardando CLIENTE definir os Parametros de limite...")
 
-	// ELEMENTOS INICIAIS DA CONEXÃO DOS SOCKETS CLIENTE & SERVIDOR
+	// ELEMENTOS INICIAIS DA CONEXÃO DO SOCKET CLIENTE & SERVIDOR
 	tcpAddr, err := net.ResolveTCPAddr("tcp", ":3200")
 	checkError(err, "ResolveTCPAddr")
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	checkError(err, "ListenTCP")
 
-	// ELEMENTOS INICIAIS DA CONEXÃO DOS SOCKETS ESTUFA & SERVIDOR (SENSORES)
-	addrEstufaSensor, err := net.ResolveTCPAddr("tcp", ":3300")
+	// ELEMENTOS INICIAIS DA CONEXÃO DO SOCKET SERVIDOR & SERVIDOR
+	addrEstufa, err := net.ResolveTCPAddr("tcp", ":3300")
 	checkError(err, "ResolveTCPAddr")
-	listenerEstufaSensor, err := net.ListenTCP("tcp", addrEstufaSensor)
+	listenerEstufa, err := net.ListenTCP("tcp", addrEstufa)
 	checkError(err, "ListenTCP")
 
-
+	// PASSAGEM DE PARAMETROS DE LIMITES
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -70,10 +70,11 @@ func main() {
 		connGetParametrosDoCliente(conn)
 		break
 	}
+
 	fmt.Println("Aguardando estufa.go ser iniciada...")
 
 	go loopGetSensorCliente(listener)
-	go loopGetSensoresEstufa(listenerEstufaSensor)
+	go loopGetSensoresEstufa(listenerEstufa)
 
 	for {
 		continue
@@ -81,7 +82,7 @@ func main() {
 }
 
 func presetAtuadores() {
-	//DEFININDO VALORES INICIAIS PARA A STRUCT ATUADORES
+	//DEFININDO VALORES INICIAIS PARA OS ATUADORES DENTRO DA ESTUFA
 	var aquecedor Atuador
 	aquecedor.nome = "Aquecedor"
 	aquecedor.id = 10
@@ -102,7 +103,7 @@ func presetAtuadores() {
 	injetorCO2.id = 40
 	injetorCO2.status = 0
 
-	//ADICIONANDO SENSORES A ESTUFA
+	//ADICIONANDO ATUADORES A ESTUFA
 	estufa.atuadores = append(estufa.atuadores, aquecedor)
 	estufa.atuadores = append(estufa.atuadores, resfriador)
 	estufa.atuadores = append(estufa.atuadores, irrigador)
@@ -114,11 +115,105 @@ func presetSensores() {
 	var umidade Sensor
 	var nivelCO2 Sensor
 
-	//ADICIONANDO SENSORES A ESTUFA
+	//ADICIONANDO SENSORES VAZIOS A ESTUFA
 	estufa.sensores = append(estufa.sensores, temperatura)
 	estufa.sensores = append(estufa.sensores, umidade)
 	estufa.sensores = append(estufa.sensores, nivelCO2)
-	//----------------
+}
+
+func loopGetSensoresEstufa(listenerEstufa *net.TCPListener) {
+
+	for {
+		for {
+			conn, err := listenerEstufa.Accept()
+			if err != nil {
+				return
+			}
+
+			connGetSensoresInfoDaEstufa(conn)
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
+
+func loopGetSensorCliente(listener *net.TCPListener) {
+	for {
+		for {
+			novaConn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+
+			connRetornaSensorInfo(novaConn)
+		}
+	}
+}
+
+func connGetParametrosDoCliente(conn net.Conn) {
+	result, err := ioutil.ReadAll(conn)
+	checkError(err, "ReadAll")
+
+	packet := gopacket.NewPacket(
+		result,
+		camada.ParametersLayerType,
+		gopacket.Default,
+	)
+
+	decodePacket := packet.Layer(camada.ParametersLayerType)
+
+	if decodePacket != nil {
+		fmt.Println("------------ PARAMETROS DEFINIDOS --------------")
+		content, _ := decodePacket.(*camada.ParametersLayer)
+		fmt.Println("TemperaturaMin:", int16(content.TemperaturaMin))
+		fmt.Println("TemperaturaMax:", int16(content.TemperaturaMax))
+		fmt.Println("UmidadeMin:", content.UmidadeMin)
+		fmt.Println("NivelCO2Min:", content.NivelCO2Min)
+		fmt.Println("------------------------------------------------")
+
+		//GUARDANDOS PARAMENTROS NA MEMORIA LOCAL DO SEVIDOR
+		estufa.parametrosIni.temperaturaMin = int16(content.TemperaturaMin)
+		estufa.parametrosIni.temperaturaMax = int16(content.TemperaturaMax)
+		estufa.parametrosIni.umidadeMin = content.UmidadeMin
+		estufa.parametrosIni.nivelCO2Min = content.NivelCO2Min
+	}
+	_ = conn.Close()
+}
+
+func connGetSensoresInfoDaEstufa(conn net.Conn) {
+	result := make([]byte, 63)
+	_, err := conn.Read(result[:])
+	checkError(err, "Conn.Read/GetSensores")
+
+	// CRIA O PACOTE DOS DADOS RECEBIDOS DE ACORDO COM SensoresLayer EXIGE
+	pacote := gopacket.NewPacket(
+		result,
+		camada.SensoresLayerType,
+		gopacket.Default,
+	)
+
+	decodePacote := pacote.Layer(camada.SensoresLayerType)
+
+	//GUARDANDOS SENSORES ATUALIZADOS NA MEMORIA LOCAL DO SEVIDOR
+	if decodePacote != nil {
+		content, _ := decodePacote.(*camada.SensoresLayer)
+		estufa.sensores[0].id = content.Temperatura.IDSensor
+		estufa.sensores[0].nome = content.Temperatura.Nome
+		estufa.sensores[0].valor = int16(content.Temperatura.Valor)
+
+		estufa.sensores[1].id = content.Umidade.IDSensor
+		estufa.sensores[1].nome = content.Umidade.Nome
+		estufa.sensores[1].valor =  int16(content.Umidade.Valor)
+
+		estufa.sensores[2].id = content.NivelDeCO2.IDSensor
+		estufa.sensores[2].nome = content.NivelDeCO2.Nome
+		estufa.sensores[2].valor =  int16(content.NivelDeCO2.Valor)
+		fmt.Println("A leitura dos sensores chegaram!")
+	}
+
+	//ANTES DE ENCERRAR A CONEXAO --
+	verificaOsLimitesMinMax(conn)
+	_ = conn.Close()
 }
 
 func verificaOsLimitesMinMax(conn net.Conn) {
@@ -183,11 +278,42 @@ func verificaOsLimitesMinMax(conn net.Conn) {
 	var buffer bytes.Buffer
 	n := len(atuadoresAlterados)
 
+	//COMO MAIS DE UM SENSOR PODE SER LIGADO OU DESLIGADO ENTAO n RECEBE A QUANTIDADE
 	if n != 0 {
 		buffer = convertAtuadoresEmArrayBytes(atuadoresAlterados, buffer, n)
 	}
 
-	conn.Write(buffer.Bytes())
+	//ENVIO PARA A ESTUFA OS SENSORES QUE FORAM ATIVADOS OU DESATIVADOS
+	_, err := conn.Write(buffer.Bytes())
+	checkError(err, "conn.Write/Sensores" )
+}
+
+func connRetornaSensorInfo(conn net.Conn) {
+	result := make([]byte, 2)
+	_, _ = conn.Read(result[:])
+	valor := binary.BigEndian.Uint16(result)
+
+	var dadosSensor Sensor
+	// BUSCA QUAL SENSOR DEVE SER ENVIADO
+	for _, sensor := range estufa.sensores {
+		if sensor.id == valor {
+			dadosSensor = sensor
+		}
+	}
+
+	var buffer bytes.Buffer
+	buffer = converteSensorEmArrayDeBytes(dadosSensor, buffer)
+
+	// CODIFICA O PACOTE USANDO A SensorLayer DO PROTOCOLO
+	pacote := gopacket.NewPacket(
+		buffer.Bytes(),
+		camada.SensorLayerType,
+		gopacket.Default,
+	)
+
+	//ENVIO O PACOTE PRO CLIENTE
+	_,_ = conn.Write(pacote.Data())
+	_ = conn.Close()
 }
 
 func convertAtuadoresEmArrayBytes(atuadores []Atuador, buffer bytes.Buffer, n int) bytes.Buffer {
@@ -215,122 +341,6 @@ func convertAtuadoresEmArrayBytes(atuadores []Atuador, buffer bytes.Buffer, n in
 	return buffer
 }
 
-func loopGetSensoresEstufa(listenerEstufa *net.TCPListener) {
-
-	for {
-		for {
-			conn, err := listenerEstufa.Accept()
-			if err != nil {
-				return
-			}
-
-			connGetSensoresInfoDaEstufa(conn)
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
-}
-
-func loopGetSensorCliente(listener *net.TCPListener) {
-	for {
-		for {
-			novaConn, err := listener.Accept()
-			if err != nil {
-				return
-			}
-
-			connRetornaSensorInfo(novaConn)
-		}
-	}
-}
-
-func connGetParametrosDoCliente(conn net.Conn) {
-	result, err := ioutil.ReadAll(conn)
-	checkError(err, "ReadAll")
-
-	packet := gopacket.NewPacket(
-		result,
-		camada.ParametersLayerType,
-		gopacket.Default,
-	)
-
-	decodePacket := packet.Layer(camada.ParametersLayerType)
-
-	if decodePacket != nil {
-		fmt.Println("------------ PARAMETROS DEFINIDOS --------------")
-		content, _ := decodePacket.(*camada.ParametersLayer)
-		fmt.Println("TemperaturaMin:", int16(content.TemperaturaMin))
-		fmt.Println("TemperaturaMax:", int16(content.TemperaturaMax))
-		fmt.Println("UmidadeMin:", content.UmidadeMin)
-		fmt.Println("NivelCO2Min:", content.NivelCO2Min)
-		fmt.Println("------------------------------------------------")
-
-		//GUARDADOS PARAMENTROS NA MEMORIA LOCAL DO SEVIDOR
-		estufa.parametrosIni.temperaturaMin = int16(content.TemperaturaMin)
-		estufa.parametrosIni.temperaturaMax = int16(content.TemperaturaMax)
-		estufa.parametrosIni.umidadeMin = content.UmidadeMin
-		estufa.parametrosIni.nivelCO2Min = content.NivelCO2Min
-	}
-	conn.Close()
-}
-
-func connGetSensoresInfoDaEstufa(conn net.Conn) {
-	result := make([]byte, 63)
-	conn.Read(result[:])
-
-	pacote := gopacket.NewPacket(
-		result,
-		camada.SensoresLayerType,
-		gopacket.Default,
-	)
-
-	decodePacote := pacote.Layer(camada.SensoresLayerType)
-
-	if decodePacote != nil {
-		content, _ := decodePacote.(*camada.SensoresLayer)
-		estufa.sensores[0].id = content.Temperatura.IDSensor
-		estufa.sensores[0].nome = content.Temperatura.Nome
-		estufa.sensores[0].valor = int16(content.Temperatura.Valor)
-
-		estufa.sensores[1].id = content.Umidade.IDSensor
-		estufa.sensores[1].nome = content.Umidade.Nome
-		estufa.sensores[1].valor =  int16(content.Umidade.Valor)
-
-		estufa.sensores[2].id = content.NivelDeCO2.IDSensor
-		estufa.sensores[2].nome = content.NivelDeCO2.Nome
-		estufa.sensores[2].valor =  int16(content.NivelDeCO2.Valor)
-		fmt.Println("A leitura dos sensores chegaram!")
-	}
-
-	verificaOsLimitesMinMax(conn)
-	conn.Close()
-}
-
-func connRetornaSensorInfo(conn net.Conn) {
-	result := make([]byte, 2)
-	conn.Read(result[:])
-	valor := binary.BigEndian.Uint16(result)
-
-	var dadosSensor Sensor
-	for _, sensor := range estufa.sensores {
-		if sensor.id == valor {
-			dadosSensor = sensor
-		}
-	}
-
-	var buffer bytes.Buffer
-	buffer = converteSensorEmArrayDeBytes(dadosSensor, buffer)
-
-	pacote := gopacket.NewPacket(
-		buffer.Bytes(),
-		camada.SensorLayerType,
-		gopacket.Default,
-	)
-
-	conn.Write(pacote.Data())
-	conn.Close()
-}
-
 func converteSensorEmArrayDeBytes(sensor Sensor, buffer bytes.Buffer) bytes.Buffer {
 
 	var nomeBytes = make([]byte, 15)
@@ -353,7 +363,7 @@ func converteSensorEmArrayDeBytes(sensor Sensor, buffer bytes.Buffer) bytes.Buff
 
 func checkError(err error, msg string){
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Erro em " + msg, err.Error())
+		_ :fmt.Fprintf(os.Stderr, "Erro em " + msg, err.Error())
 		os.Exit(1)
 	}
 }
