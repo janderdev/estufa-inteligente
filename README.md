@@ -38,4 +38,4 @@ go run estufa/estufa.go
 Pronto a aplicação está sendo executada e as informações estão sendo trocadas entre o
 Cliente, Servidor e a Estufa.
 
-O terminal referente ao Cliente agora retorna o valor dos sensor atualizado, quando requisitado.
+O terminal referente ao Cliente agora retorna o valor do sensor atualizado, quando requisitado.
