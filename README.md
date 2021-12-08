@@ -6,7 +6,7 @@ docker pull douglasmoraiis/estufainteligente:latest
 ## Instalação
 Execute a imagem baixada em um container:
 ```
-docker run --name estufa -it douglas/estufainteligente
+docker run --name estufa -it douglasmoraiis/estufainteligente
 ```
 ## Execução da aplicação
 Quando o terminal da imagem iniciar, execute o arquivo `servidor.go`:

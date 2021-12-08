@@ -131,7 +131,7 @@ func connRetornaSensoresInfo(addr *net.TCPAddr) {
 
 		if len(result) != 0  {
 
-			tam, atuadores := contaTamanhoDoPacote(result[:])
+			tam, atuadores := conectaAtuadores(result[:])
 			fmt.Println("------------ ATUADOR(ES) ALTERADO(S) --------------")
 			for i := 0; i < tam; i++ {
 				var status string
@@ -226,7 +226,7 @@ func converteSensoresEmArrayDeBytes(sensores []Sensor, buffer bytes.Buffer) byte
 	return buffer
 }
 
-func contaTamanhoDoPacote(result []byte) (int, []Atuador){
+func conectaAtuadores(result []byte) (int, []Atuador){
 	var tam = int(binary.BigEndian.Uint16(result[:2]))
 
 	var atuadores [] Atuador

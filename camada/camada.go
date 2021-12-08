@@ -22,7 +22,7 @@ type SensorLayer struct {
 	restoDosDados [] byte
 }
 
-// SensorLayer É uma camada do protocolo que trata comunicação (codificação e decodificação) de um ARRAY de sensores.
+// SensoresLayer É uma camada do protocolo que trata comunicação (codificação e decodificação) de um ARRAY de sensores.
 type SensoresLayer struct {
 	Temperatura SensorLayer
 	Umidade SensorLayer
@@ -43,7 +43,6 @@ type AtuadoresLayer struct {
 	Atuadores [] AtuadorLayer
 	restoDosDados []byte
 }
-
 
 var ParametersLayerType = gopacket.RegisterLayerType(
 	2002,
