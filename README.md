@@ -1,3 +1,6 @@
+# 🌿 Estufa Inteligente com Controle Automatizado
+Projeto de uma estufa inteligente desenvolvida em Go, com controle automatizado de sensores, aquecedores e resfriadores para monitoramento e ajuste dinâmico do ambiente.
+
 ## Download da imagem
 Baixe a imagem remota para a sua máquina:
 ```
