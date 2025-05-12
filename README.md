@@ -1,44 +1,76 @@
-# 🌿 Estufa Inteligente com Controle Automatizado
-Projeto de uma estufa inteligente desenvolvida em Go, com controle automatizado de sensores, aquecedores e resfriadores para monitoramento e ajuste dinâmico do ambiente.
+🌿 Estufa Inteligente com Controle Automatizado
 
-## Download da imagem
-Baixe a imagem remota para a sua máquina:
+Este projeto consiste em uma **estufa inteligente desenvolvida em Go**, com automação completa de sensores, aquecedores e resfriadores, possibilitando o **monitoramento dinâmico e o ajuste automático do ambiente**.
+
+## 📦 Download da Imagem Docker
+
+Faça o download da imagem remota para sua máquina com o comando abaixo:
+
 ```
 docker pull douglasmoraiis/estufainteligente:latest
 ```
-## Instalação
+
+## 🚀 Instalação
+
 Execute a imagem baixada em um container:
+
 ```
 docker run --name estufa -it douglasmoraiis/estufainteligente
 ```
-## Execução da aplicação
-Quando o terminal da imagem iniciar, execute o arquivo `servidor.go`:
+
+## 🧠 Execução da Aplicação
+
+### 1. Inicie o servidor
+
+Após o terminal do container ser iniciado, execute o servidor:
+
 ```
 go run servidor/servidor.go
 ```
-Agora abra um novo terminal no seu computador e execute o seguinte comando:
+
+### 2. Inicie o cliente
+
+Abra um novo terminal em seu computador e execute:
+
 ```
 docker container exec -it estufa bash
 ```
-Ele vai abrir um novo terminal da mesma imagem que já está em execução.
 
-Execute o arquivo `cliente.go`:
+Dentro do container, rode o cliente:
+
 ```
 go run cliente/cliente.go
 ```
-Quando o cliente executar, preencha os Parâmetros que delimitam os limites da estufa.
 
-Obs.: Depois que os limites forem definidos um novo dialogo é exibido. Por enquanto ele retorna apenas valores vazios, pois a conexão do Servidor com a Estufa ainda não foi estabelecida.
+Durante a execução, o cliente solicitará os **parâmetros que definem os limites da estufa** (ex: temperatura mínima e máxima).
 
-Então, abra um novo terminal e novamente execute o comando:
+> ⚠️ Após o preenchimento dos limites, um novo diálogo será exibido. Nesse ponto, os valores ainda estarão vazios, pois a conexão entre o servidor e a estufa ainda não foi estabelecida.
+
+### 3. Inicie a estufa
+
+Em outro terminal, execute novamente o comando:
+
 ```
 docker container exec -it estufa bash
 ```
-E agora execute o arquivo `estufa.go`:
+
+E depois:
+
 ```
 go run estufa/estufa.go
 ```
-Pronto a aplicação está sendo executada e as informações estão sendo trocadas entre o
-Cliente, Servidor e a Estufa.
 
-O terminal referente ao Cliente agora retorna o valor do sensor atualizado, quando requisitado.
+✅ **Pronto!** A aplicação está em funcionamento e a comunicação entre **Cliente**, **Servidor** e **Estufa** está ativa.
+
+O terminal do cliente agora exibirá o valor do sensor atualizado sempre que requisitado.
+
+## 🛠️ Pré-requisitos
+
+Antes de iniciar o projeto, certifique-se de ter os seguintes itens instalados:
+
+- [Go](https://golang.org/dl/)
+- [Docker](https://www.docker.com/get-started)
+
+## 📄 Licença
+
+Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para mais detalhes.
